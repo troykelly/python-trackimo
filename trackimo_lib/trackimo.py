@@ -7,8 +7,6 @@ import asyncio
 import json
 import time
 
-LOG = logging.getLogger(__name__)
-
 
 class TokenError(Exception):
     def __init__(self, message):
@@ -22,8 +20,9 @@ class ConfigError(Exception):
 
 class Trackimo:
 
-    def __init__(self, config, loop=None):
+    def __init__(self, config, loop=None, logger=None):
         self.loop = loop if loop else asyncio.get_event_loop()
+        self._logger = logger if logger else logging.getLogger(__name__)
         self._config = config
         self._token = {}
         self._user = {}
@@ -33,6 +32,15 @@ class Trackimo:
         self.validateConfig()
 
     def validateConfig(self):
+        if not 'log_level' in self._config:
+            self._config['log_level'] = logging.INFO
+        else:
+            self._config['log_level'] = self._config['log_level'].upper()
+        if not 'log_formatter' in self._config:
+            self._config['log_formatter'] = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
+        logging.basicConfig(level=self._config['log_level'],
+                            format=self._config['log_formatter'])
+
         if not 'trackimo' in self._config:
             self._config['trackimo'] = {}
         if not 'username' in self._config['trackimo']:
@@ -89,9 +97,10 @@ class Trackimo:
         username = self._config['trackimo']['username']
         password = self._config['trackimo']['password']
         api = self._config['api']
-        LOG.debug("Getting Token for %s" % username)
-        LOG.debug("Using Login API Endpoint: %s" % api['endpointInternal'])
-        LOG.debug("Using API Endpoint: %s" % api['endpoint'])
+        self._logger.debug("Getting Token for %s" % username)
+        self._logger.debug("Using Login API Endpoint: %s" %
+                           api['endpointInternal'])
+        self._logger.debug("Using API Endpoint: %s" % api['endpoint'])
 
         # Create a session to manage the login
         session = requests.session()
@@ -104,7 +113,7 @@ class Trackimo:
                          json=payload, allow_redirects=False, cookies=jar)
 
         if 'JSESSIONID' not in session.cookies:
-            LOG.debug(session.cookies)
+            self._logger.debug(session.cookies)
             raise ConfigError('No session identity received')
 
         # Get a token code
@@ -187,7 +196,7 @@ class Trackimo:
         self._locations = locations
         self.loop.create_task(self._updateListeners(locations, ts))
         if updateDelay is not None:
-            LOG.debug("Waiting for %d seconds..." % updateDelay)
+            self._logger.debug("Waiting for %d seconds..." % updateDelay)
             self.loop.call_later(
                 updateDelay, self.updateLocations, updateDelay)
 
