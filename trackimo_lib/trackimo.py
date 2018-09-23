@@ -30,6 +30,47 @@ class Trackimo:
         self._devices = {}
         self._locations = {}
         self._listeners = []
+        validateConfig()
+
+    def validateConfig(self):
+        if not 'trackimo' in cfg:
+            self._config['trackimo'] = {}
+        if not 'username' in self._config['trackimo']:
+            self._config['trackimo']['username'] = None
+        if not 'password' in self._config['trackimo']:
+            self._config['trackimo']['password'] = None
+        if not 'update_frequency' in self._config['trackimo']:
+            self._config['trackimo']['update_frequency'] = 1
+
+        if not self._config['trackimo']['username'] and not self._config['trackimo']['password']:
+            raise ConfigError(
+                'Must supply both a username and password for the trackimo service')
+        elif not self._config['trackimo']['password']:
+            raise ConfigError(
+                'Must supply a password for the trackimo service')
+        elif not self._config['trackimo']['username']:
+            raise ConfigError(
+                'Must supply a username for the trackimo service')
+
+        if not 'api' in cfg:
+            self._config['api'] = {}
+        if not 'protocol' in self._config['api']:
+            self._config['api']['protocol'] = 'https'
+        if not 'host' in self._config['api']:
+            self._config['api']['host'] = 'app.trackimo.com'
+        if not 'version' in self._config['api']:
+            self._config['api']['version'] = '3'
+        if not 'client_id' in self._config['api']:
+            self._config['api']['client_id'] = '943f9b0f-73c8-4435-8801-0260db687f05'
+        if not 'client_secret' in self._config['api']:
+            self._config['api']['client_secret'] = '96ca64b0ae5f7005fd18387a28019615'
+        if not 'endpoint' in self._config['api']:
+            self._config['api']['endpoint'] = self._config['api']['protocol'] + '://' + \
+                self._config['api']['host'] + '/api/v' + \
+                self._config['api']['version'] + '/'
+        if not 'endpointInternal' in self._config['api']:
+            self._config['api']['endpointInternal'] = self._config['api']['protocol'] + \
+                '://' + self._config['api']['host'] + '/api/internal/v1/'
 
     def connect(self):
         self.getToken()
