@@ -81,9 +81,9 @@ class Trackimo:
                 '://' + self._config['api']['host'] + '/api/internal/v1/'
 
     def connect(self):
-        self.getToken()
-        self.getUser()
-        self.getDevices()
+        await self.getToken()
+        await self.getUser()
+        await self.getDevices()
 
     def addListener(self, listenerFunction):
         self._listeners.append(listenerFunction)
