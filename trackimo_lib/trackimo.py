@@ -81,7 +81,8 @@ class Trackimo:
         self._listeners.append(listenerFunction)
 
     def getToken(self):
-        self.loop.run_until_complete(self._getToken())
+        taskToken = self.loop.create_task(self._getToken())
+        await taskToken
 
     @asyncio.coroutine
     def _getToken(self):
@@ -135,7 +136,8 @@ class Trackimo:
         self._token = token_response
 
     def getUser(self):
-        self.loop.run_until_complete(self._getUser())
+        taskUser = self.loop.create_task(self._getUser())
+        await taskUser
 
     @asyncio.coroutine
     def _getUser(self):
@@ -149,7 +151,8 @@ class Trackimo:
         self._user = user_response
 
     def getDevices(self):
-        self.loop.run_until_complete(self._getDevices())
+        taskDevices = self.loop.create_task(self._getDevices())
+        await taskDevices
 
     @asyncio.coroutine
     def _getDevices(self):
