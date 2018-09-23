@@ -30,10 +30,10 @@ class Trackimo:
         self._devices = {}
         self._locations = {}
         self._listeners = []
-        validateConfig()
+        self.validateConfig()
 
     def validateConfig(self):
-        if not 'trackimo' in cfg:
+        if not 'trackimo' in self._config:
             self._config['trackimo'] = {}
         if not 'username' in self._config['trackimo']:
             self._config['trackimo']['username'] = None
@@ -52,7 +52,7 @@ class Trackimo:
             raise ConfigError(
                 'Must supply a username for the trackimo service')
 
-        if not 'api' in cfg:
+        if not 'api' in self._config:
             self._config['api'] = {}
         if not 'protocol' in self._config['api']:
             self._config['api']['protocol'] = 'https'

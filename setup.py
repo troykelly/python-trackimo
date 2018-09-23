@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="trackimo",
-    version="0.0.2",
+    version="0.0.4",
     author="Troy Kelly",
     author_email="troy@troykelly.com",
     description="Access GPS location data of your Trackimo devices",
