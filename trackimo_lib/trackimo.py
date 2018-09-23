@@ -80,7 +80,7 @@ class Trackimo:
     def addListener(self, listenerFunction):
         self._listeners.append(listenerFunction)
 
-    def getToken(self):
+    async def getToken(self):
         taskToken = self.loop.create_task(self._getToken())
         await taskToken
 
@@ -135,7 +135,7 @@ class Trackimo:
 
         self._token = token_response
 
-    def getUser(self):
+    async def getUser(self):
         taskUser = self.loop.create_task(self._getUser())
         await taskUser
 
@@ -150,7 +150,7 @@ class Trackimo:
 
         self._user = user_response
 
-    def getDevices(self):
+    async def getDevices(self):
         taskDevices = self.loop.create_task(self._getDevices())
         await taskDevices
 
