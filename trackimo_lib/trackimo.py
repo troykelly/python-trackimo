@@ -81,19 +81,20 @@ class Trackimo:
                 '://' + self._config['api']['host'] + '/api/internal/v1/'
 
     def connect(self):
-        await self.getToken()
-        await self.getUser()
-        await self.getDevices()
+        self.getToken()
+        self.getUser()
+        self.getDevices()
+
+    @asyncio.coroutine
+    def _connect(self):
+        self.getToken()
+        self.getUser()
+        self.getDevices()
 
     def addListener(self, listenerFunction):
         self._listeners.append(listenerFunction)
 
-    async def getToken(self):
-        taskToken = self.loop.create_task(self._getToken())
-        await taskToken
-
-    @asyncio.coroutine
-    def _getToken(self):
+    def getToken(self):
         username = self._config['trackimo']['username']
         password = self._config['trackimo']['password']
         api = self._config['api']
@@ -144,12 +145,7 @@ class Trackimo:
 
         self._token = token_response
 
-    async def getUser(self):
-        taskUser = self.loop.create_task(self._getUser())
-        await taskUser
-
-    @asyncio.coroutine
-    def _getUser(self):
+    def getUser(self):
         headers = {'Authorization': 'Bearer ' + self._token['access_token']}
         r = requests.get(self._config['api']
                          ['endpoint'] + 'user', headers=headers)
@@ -159,12 +155,7 @@ class Trackimo:
 
         self._user = user_response
 
-    async def getDevices(self):
-        taskDevices = self.loop.create_task(self._getDevices())
-        await taskDevices
-
-    @asyncio.coroutine
-    def _getDevices(self):
+    def getDevices(self):
         if not 'account_id' in self._user:
             return
         headers = {'Authorization': 'Bearer ' + self._token['access_token']}
