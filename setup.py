@@ -1,21 +1,23 @@
-import setuptools
+# -*- coding: utf-8 -*-
+"""
+    Setup file for trackimo.
+    Use setup.cfg to configure your project.
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
+    This file was generated with PyScaffold 3.2.3.
+    PyScaffold helps you to put up the scaffold of your new Python project.
+    Learn more under: https://pyscaffold.org/
+"""
+import sys
 
-setuptools.setup(
-    name="trackimo",
-    version="0.0.10",
-    author="Troy Kelly",
-    author_email="troy@troykelly.com",
-    description="Access GPS location data of your Trackimo devices",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    url="https://github.com/troykelly/python-trackimo",
-    packages=setuptools.find_packages(),
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-        "Operating System :: OS Independent",
-    ],
-)
+from pkg_resources import VersionConflict, require
+from setuptools import setup
+
+try:
+    require('setuptools>=38.3')
+except VersionConflict:
+    print("Error: version of setuptools is too old (<38.3)!")
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    setup(use_pyscaffold=True)
