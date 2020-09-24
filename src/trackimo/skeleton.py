@@ -18,6 +18,8 @@ Note: This skeleton file can be safely removed if not needed!
 import argparse
 import sys
 import logging
+import trackimo.protocol
+import trackimo.device
 
 from trackimo import __version__
 
@@ -28,21 +30,18 @@ __license__ = "mit"
 _logger = logging.getLogger(__name__)
 
 
-def fib(n):
-    """Fibonacci example function
+def track(id=None, interval=60):
+    """Track a device
 
     Args:
-      n (int): integer
+      id (int): The device id to track
+      interval (int): Seconds between updates (0 for one and exit)
 
     Returns:
-      int: n-th Fibonacci number
+      object: The device location information
     """
-    assert n > 0
-    a, b = 1, 1
-    for i in range(n-1):
-        a, b = b, a+b
-    return a
-
+    _logger.info(trackimo.device.location(id))
+    return {}
 
 def parse_args(args):
     """Parse command line parameters
@@ -54,16 +53,51 @@ def parse_args(args):
       :obj:`argparse.Namespace`: command line parameters namespace
     """
     parser = argparse.ArgumentParser(
-        description="Just a Fibonacci demonstration")
+        description="Demonstration of Lat/Lon tracking of a device")
     parser.add_argument(
         "--version",
         action="version",
         version="trackimo {ver}".format(ver=__version__))
     parser.add_argument(
-        dest="n",
-        help="n-th Fibonacci number",
+        dest="id",
+        help="The trackimo device id",
+        type=int,
+        metavar="DEVICEID")
+    parser.add_argument(
+        "-i",
+        "--interval",
+        dest="interval",
+        help="The tracking interval in seconds",
         type=int,
         metavar="INT")
+    parser.add_argument(
+        "-u",
+        "--username",
+        dest="username",
+        help="Trackimo app username",
+        type=str,
+        metavar="STR")
+    parser.add_argument(
+        "-p",
+        "--password",
+        dest="password",
+        help="Trackimo app password",
+        type=str,
+        metavar="STR")
+    parser.add_argument(
+        "-a",
+        "--appid",
+        dest="app_id",
+        help="Trackimo API App ID",
+        type=str,
+        metavar="STR")
+    parser.add_argument(
+        "-s",
+        "--appsecret",
+        dest="app_secret",
+        help="Trackimo API App Secret",
+        type=str,
+        metavar="STR")
     parser.add_argument(
         "-v",
         "--verbose",
@@ -100,8 +134,10 @@ def main(args):
     """
     args = parse_args(args)
     setup_logging(args.loglevel)
-    _logger.debug("Starting crazy calculations...")
-    print("The {}-th Fibonacci number is {}".format(args.n, fib(args.n)))
+    _logger.debug("Logging in...")
+    trackimo.protocol.login(args.username, args.password, args.app_id, args.app_secret)
+    _logger.debug("Starting tracking...")
+    track(args.id,args.interval)
     _logger.info("Script ends here")
 
 

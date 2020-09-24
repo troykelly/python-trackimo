@@ -16,12 +16,13 @@ RUN if [ "${INSTALL_NODE}" = "true" ]; then su vscode -c "source /usr/local/shar
 RUN pip3 --disable-pip-version-check --no-cache-dir install pyscaffold[all]
 
 # [Optional] Uncomment this section to install additional OS packages.
-# RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-#     && apt-get -y install --no-install-recommends <your-package-list-here>
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y install --no-install-recommends gpg && \
+    ln -s /usr/bin/gpg /usr/local/bin/gpg
 
 # Install Kite
 ADD --chown=vscode https://linux.kite.com/dls/linux/current /opt/kite/install.sh
-RUN chown -R vscode:vscode /opt/kite && \
+RUN chown -R vscode:vscode /opt/kite /usr/local/bin && \
     chmod 755 /opt/kite/install.sh && \
     cd /opt/kite && \
     echo -e "\n\n" | su vscode -c "/opt/kite/install.sh"
