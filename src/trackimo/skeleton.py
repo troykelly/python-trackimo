@@ -18,10 +18,10 @@ Note: This skeleton file can be safely removed if not needed!
 import argparse
 import sys
 import logging
-import trackimo.protocol
-import trackimo.device
+import asyncio
 
 from trackimo import __version__
+from trackimo import Trackimo
 
 __author__ = "Troy Kelly"
 __copyright__ = "Troy Kelly"
@@ -30,17 +30,19 @@ __license__ = "mit"
 _logger = logging.getLogger(__name__)
 
 
-def track(id=None, interval=60):
-    """Track a device
+async def track(devices=None, interval=60):
+    """Track all device
 
     Args:
-      id (int): The device id to track
+      devices (object): The device object
       interval (int): Seconds between updates (0 for one and exit)
 
     Returns:
       object: The device location information
     """
-    _logger.info(trackimo.device.location(id))
+    for device in devices:
+        location = await devices[device].refresh()
+        _logger.debug("%s: %s", devices[device].name, location)
     return {}
 
 def parse_args(args):
@@ -126,7 +128,7 @@ def setup_logging(loglevel):
                         format=logformat, datefmt="%Y-%m-%d %H:%M:%S")
 
 
-def main(args):
+async def main(args):
     """Main entry point allowing external calls
 
     Args:
@@ -135,16 +137,18 @@ def main(args):
     args = parse_args(args)
     setup_logging(args.loglevel)
     _logger.debug("Logging in...")
-    trackimo.protocol.login(args.username, args.password, args.app_id, args.app_secret)
+    api = Trackimo()
+    await api.login(args.app_id, args.app_secret, args.username, args.password)
     _logger.debug("Starting tracking...")
-    track(args.id,args.interval)
+    await track(api.devices)
     _logger.info("Script ends here")
 
 
 def run():
     """Entry point for console_scripts
     """
-    main(sys.argv[1:])
+    task = main(sys.argv[1:])
+    res = asyncio.get_event_loop().run_until_complete( task )
 
 
 if __name__ == "__main__":
