@@ -88,6 +88,19 @@ class DeviceHandler(object):
             f"accounts/{self.__protocol.accountid}/devices/{id}/history", data
         )
 
+    async def ops(self, id, operation="beep", options={}):
+        options["devices"] = [id]
+        return await self.__protocol.api_post(
+            f"accounts/{self.__protocol.accountid}/devices/ops/{operation}", options
+        )
+
+    async def get_features(self, id):
+        options = {}
+        options["deviceIds"] = id
+        return await self.__protocol.api(
+            path="devices/features/deviceIds", data=options, use_internal_api=True
+        )
+
 
 class Device(object):
     def __init__(self, handler, id=None):
@@ -196,52 +209,53 @@ class Device(object):
         return GEO_CACHE[location_text]
 
     async def get(self):
-        detailsData = await self.__handler.details(self.__id)
+        details_data = await self.__handler.details(self.__id)
+        features_data = await self.__get_features()
 
-        if detailsData:
+        if details_data:
             self.__imsi = (
-                detailsData["imsi"]
-                if "imsi" in detailsData and detailsData["imsi"]
+                details_data["imsi"]
+                if "imsi" in details_data and details_data["imsi"]
                 else None
             )
             self.__msisdn = (
-                detailsData["msisdn"]
-                if "msisdn" in detailsData and detailsData["msisdn"]
+                details_data["msisdn"]
+                if "msisdn" in details_data and details_data["msisdn"]
                 else None
             )
             self.__name = (
-                detailsData["name"]
-                if "name" in detailsData and detailsData["name"]
+                details_data["name"]
+                if "name" in details_data and details_data["name"]
                 else None
             )
             self.__status = (
-                detailsData["status"]
-                if "status" in detailsData and detailsData["status"]
+                details_data["status"]
+                if "status" in details_data and details_data["status"]
                 else None
             )
             self.__type = (
-                detailsData["type"]
-                if "type" in detailsData and detailsData["type"]
+                details_data["type"]
+                if "type" in details_data and details_data["type"]
                 else None
             )
             self.__typeId = (
-                int(detailsData["typeId"])
-                if "typeId" in detailsData and detailsData["typeId"]
+                int(details_data["typeId"])
+                if "typeId" in details_data and details_data["typeId"]
                 else None
             )
             self.__accountId = (
-                int(detailsData["account_id"])
-                if "account_id" in detailsData and detailsData["account_id"]
+                int(details_data["account_id"])
+                if "account_id" in details_data and details_data["account_id"]
                 else None
             )
             self.__userId = (
-                int(detailsData["user_id"])
-                if "user_id" in detailsData and detailsData["user_id"]
+                int(details_data["user_id"])
+                if "user_id" in details_data and details_data["user_id"]
                 else None
             )
             self.__iconId = (
-                int(detailsData["icon_id"])
-                if "icon_id" in detailsData and detailsData["icon_id"]
+                int(details_data["icon_id"])
+                if "icon_id" in details_data and details_data["icon_id"]
                 else None
             )
         else:
@@ -258,6 +272,24 @@ class Device(object):
         await self.refresh()
 
         return self
+
+    async def beep(self, period=2, sound=1):
+        beep_data = {"beepPeriod": period, "beepType": sound}
+        return await self.__handler.ops(self.__id, "beep", beep_data)
+
+    async def get_location(self, force_gps_read=True, send_gsm_before_lock=True):
+        get_location_data = {
+            "forceGpsRead": force_gps_read,
+            "sendGsmBeforeLock": send_gsm_before_lock,
+        }
+        return await self.__handler.ops(self.__id, "getLocation", get_location_data)
+
+    async def __get_features(self):
+        features_data = await self.__handler.get_features(self.__id)
+        if not features_data:
+            return None
+        self.__features = Features(features_data)
+        return self.__features
 
     @property
     def id(self):
@@ -365,7 +397,7 @@ class Device(object):
         if not (self.__latitude and self.__longitude and self.__locationUpdated):
             return None
         time_delta = datetime.now() - self.__locationUpdated
-        return time_delta.total_seconds()
+        return round(time_delta.total_seconds())
 
     @property
     def battery(self):
@@ -457,56 +489,28 @@ class Device(object):
             return None
         return self.__iconId
 
+    @property
+    def features(self):
+        if not self.__features:
+            return None
+        return self.__features
 
-sample = {
-    "accuracy": 0.001,
-    "address": "Belcastro, Belcastro Lane, Eight Mile Plains, Brisbane, Queensland, 4113, Australia",
-    "bbox": {
-        "northeast": [-27.5854166, 153.0867724],
-        "southwest": [-27.5857226, 153.0865314],
-    },
-    "city": "Brisbane",
-    "confidence": 10,
-    "country": "Australia",
-    "country_code": "au",
-    "importance": 0.001,
-    "lat": -27.585563649999997,
-    "lng": 153.08665216347964,
-    "ok": True,
-    "osm_id": 621636139,
-    "osm_type": "way",
-    "place_id": 210004813,
-    "place_rank": 30,
-    "postal": "4113",
-    "quality": "house",
-    "raw": {
-        "place_id": 210004813,
-        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright",
-        "osm_type": "way",
-        "osm_id": 621636139,
-        "boundingbox": ["-27.5857226", "-27.5854166", "153.0865314", "153.0867724"],
-        "lat": "-27.585563649999997",
-        "lon": "153.08665216347964",
-        "display_name": "Belcastro, Belcastro Lane, Eight Mile Plains, Brisbane, Queensland, 4113, Australia",
-        "place_rank": 30,
-        "category": "building",
-        "type": "house",
-        "importance": 0.001,
-        "address": {
-            "building": "Belcastro",
-            "road": "Belcastro Lane",
-            "suburb": "Eight Mile Plains",
-            "city": "Brisbane",
-            "state": "Queensland",
-            "postcode": "4113",
-            "country": "Australia",
-            "country_code": "au",
-        },
-    },
-    "region": "Queensland",
-    "state": "Queensland",
-    "status": "OK",
-    "street": "Belcastro Lane",
-    "suburb": "Eight Mile Plains",
-    "type": "house",
-}
+
+class Features(object):
+    def __init__(self, payload={}):
+        super().__init__()
+        for device in payload:
+            if "id" in device:
+                self.id = device["id"]
+            if "fwVer" in device:
+                self.firmware = device["fwVer"]
+            if "fwVerExternal" in device:
+                self.external = device["fwVerExternal"]
+            if "features" in device:
+                for attribute, value in device["features"].items():
+                    if str(value) == "not-supported":
+                        setattr(self, attribute, False)
+                    elif str(value) == "supported":
+                        setattr(self, attribute, True)
+                    else:
+                        setattr(self, attribute, value)

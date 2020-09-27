@@ -27,8 +27,8 @@ _logger = logging.getLogger(__name__)
 class Protocol(object):
     def __init__(
         self,
-        clientid,
-        clientsecret,
+        client_id,
+        client_secret,
         host="app.trackimo.com",
         version=3,
         port=443,
@@ -40,8 +40,8 @@ class Protocol(object):
         super().__init__()
         self.__loop = loop if loop else asyncio.get_event_loop()
 
-        self.__clientid = clientid
-        self.__clientsecret = clientsecret
+        self.__client_id = client_id
+        self.__client_secret = client_secret
         self.__host = host
         self.__version = version
         self.__port = port
@@ -49,6 +49,9 @@ class Protocol(object):
 
         self.__api_url = (
             f"{self.__protocol}://{self.__host}:{self.__port}/api/v{self.__version}"
+        )
+        self.__internal_url = (
+            f"{self.__protocol}://{self.__host}:{self.__port}/api/internal/v1"
         )
         self.__api_login_url = f"{self.__protocol}://{self.__host}:{self.__port}/api/internal/v2/user/login"
 
@@ -70,6 +73,8 @@ class Protocol(object):
             "geozones",
         ]
 
+        _logger.debug("Protocol handler ready.")
+
     @property
     def accountid(self):
         return self.__trackimo_accountid
@@ -89,6 +94,32 @@ class Protocol(object):
         if not self.__loop:
             return None
         return self.__loop
+
+    @property
+    def username(self):
+        if not self.__trackimo_username:
+            return None
+        return self.__trackimo_username
+
+    @username.setter
+    def username(self, username):
+        self.__trackimo_username = username
+
+    @property
+    def password(self):
+        if not self.__trackimo_password:
+            return None
+        return self.__trackimo_password
+
+    @password.setter
+    def password(self, password):
+        self.__trackimo_password = password
+
+    async def restore_session(self, refresh_token):
+        self.__refresh_token = refresh_token
+        _logger.debug("Restoring session with token: %s", self.__refresh_token)
+        await self.__token_refresh()
+        return self.auth
 
     async def login(self, username=None, password=None, scopes=None):
 
@@ -112,15 +143,15 @@ class Protocol(object):
         }
 
         auth_payload = {
-            "client_id": self.__clientid,
+            "client_id": self.__client_id,
             "redirect_uri": "https://app.trackimo.com/api/internal/v1/oauth_redirect",
             "response_type": "code",
             "scope": ",".join(self.__scopes),
         }
 
         token_payload = {
-            "client_id": self.__clientid,
-            "client_secret": self.__clientsecret,
+            "client_id": self.__client_id,
+            "client_secret": self.__client_secret,
             "code": None,
         }
 
@@ -129,7 +160,10 @@ class Protocol(object):
                 "POST", self.__api_login_url, json=login_payload, allow_redirects=True
             )
 
-        future = self.__loop.run_in_executor(None, send_login_payload)
+        try:
+            future = self.__loop.run_in_executor(None, send_login_payload)
+        except Exception as err:
+            raise err
 
         response = await future
 
@@ -190,8 +224,8 @@ class Protocol(object):
             return await self.login()
 
         refresh_payload = {
-            "client_id": self.__clientid,
-            "client_secret": self.__clientsecret,
+            "client_id": self.__client_id,
+            "client_secret": self.__client_secret,
             "refresh_token": self.__refresh_token,
         }
 
@@ -201,9 +235,17 @@ class Protocol(object):
         self.__api_expires = None
 
         try:
-            data = await self.api_post("oauth2/token/refresh", refresh_payload)
+            _logger.debug("Sending refresh payload: %s", refresh_payload)
+            data = await self.api(
+                method="POST",
+                path="oauth2/token/refresh",
+                data=refresh_payload,
+                headers=None,
+                no_check=True,
+            )
+            # data = await self.api_post("oauth2/token/refresh", refresh_payload)
         except TrackimoAPI as apierror:
-            _logger.debug("Could not refresh. Trying to log in.")
+            _logger.debug("Could not refresh. Trying to log in. %s", apierror.body)
             return await self.login()
         except:
             raise Exception(sys.exc_info()[0])
@@ -243,15 +285,29 @@ class Protocol(object):
         self.__trackimo_accountid = user.accountId
         return user
 
-    async def api(self, method="GET", path="", data=None, headers={}):
+    async def api(
+        self,
+        method="GET",
+        path="",
+        data=None,
+        headers={},
+        no_check=False,
+        use_internal_api=False,
+    ):
         if not self.__session:
             raise NoSession("There is no current API session. Please login() first.")
 
-        if self.__api_expires and datetime.now() > self.__api_expires:
+        if not no_check and (
+            self.__api_expires and datetime.now() > self.__api_expires
+        ):
             _logger.debug("Refreshing token, it has expired.")
             self.__token_refresh()
 
-        url = f"{self.__api_url}/{path}"
+        url = (
+            f"{self.__api_url}/{path}"
+            if not use_internal_api
+            else f"{self.__internal_url}/{path}"
+        )
 
         method = method.upper()
         json = None
@@ -270,19 +326,20 @@ class Protocol(object):
             if data:
                 json = data
 
-        if self.__api_token:
+        if not no_check and self.__api_token:
             headers["Authorization"] = f"Bearer {self.__api_token}"
 
-        _logger.debug({"url": url, "params": params, "data": json})
-
         def process_request():
+            _logger.debug(
+                {"url": url, "params": params, "data": json, "headers": headers}
+            )
             return self.__session.request(
                 method, url, params=params, json=json, headers=headers
             )
 
         future = self.__loop.run_in_executor(None, process_request)
-
         response = await future
+
         success = 200 <= response.status_code <= 299
         try:
             data = response.json()
@@ -290,7 +347,6 @@ class Protocol(object):
             data = None
         if not success:
             body = response.body if hasattr(response, "body") else None
-            _logger.error(response.headers)
             raise TrackimoAPI(
                 "Trackimo API Call failed.",
                 response.status_code,

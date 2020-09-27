@@ -9,13 +9,37 @@ _logger = logging.getLogger(__name__)
 
 
 class Trackimo(object):
-    def __init__(self, loop=None):
+    def __init__(self, loop=None, client_id=None, client_secret=None):
         super().__init__()
+        self.__client_id = client_id if client_id else None
+        self.__client_secret = client_secret if client_secret else None
         self.__loop = loop if loop else asyncio.get_event_loop()
         self.__devices = None
         self.__account = None
 
-    async def login(self, clientid, clientsecret, username, password):
+    async def restore_session(self, refresh_token):
+        _logger.debug("Restoring Session")
+        self.__protocol = protocol.Protocol(
+            client_id=self.__client_id,
+            client_secret=self.__client_secret,
+            username=None,
+            password=None,
+            loop=self.__loop,
+        )
+        _logger.debug("Have protocol")
+        authData = await self.__protocol.restore_session(refresh_token)
+        if not authData:
+            raise UnableToAuthenticate("Not authenticated with Trackimo API")
+
+        accountHandler = account.AccountHandler(self.__protocol)
+        deviceHandler = device.DeviceHandler(self.__protocol)
+
+        self.__account = await accountHandler.get()
+        self.__devices = await deviceHandler.get()
+
+        return self
+
+    async def login(self, username, password):
         """Login to the Trackimo API
 
         Attributes:
@@ -25,8 +49,8 @@ class Trackimo(object):
             password (str): The Trackimo Password
         """
         self.__protocol = protocol.Protocol(
-            clientid=clientid,
-            clientsecret=clientsecret,
+            client_id=self.__client_id,
+            client_secret=self.__client_secret,
             username=username,
             password=password,
             loop=self.__loop,
