@@ -243,7 +243,6 @@ class Protocol(object):
                 headers=None,
                 no_check=True,
             )
-            # data = await self.api_post("oauth2/token/refresh", refresh_payload)
         except TrackimoAPI as apierror:
             _logger.debug("Could not refresh. Trying to log in. %s", apierror.body)
             return await self.login()
@@ -301,7 +300,7 @@ class Protocol(object):
             self.__api_expires and datetime.now() > self.__api_expires
         ):
             _logger.debug("Refreshing token, it has expired.")
-            self.__token_refresh()
+            await self.__token_refresh()
 
         url = (
             f"{self.__api_url}/{path}"
