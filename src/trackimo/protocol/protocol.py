@@ -369,6 +369,13 @@ class Protocol(object):
                 data = None
 
             if response.status_code == 401 or response.status_code == 403:
+                error_payload = {
+                    "status": response.status_code,
+                    "body": body,
+                    "data": data,
+                    "headers": headers,
+                }
+                _logger.error(error_payload)
                 raise TrackimoAccessDenied(
                     "Trackimo API Access denied.",
                     response.status_code,
@@ -378,6 +385,13 @@ class Protocol(object):
                 )
 
             if not success:
+                error_payload = {
+                    "status": response.status_code,
+                    "body": body,
+                    "data": data,
+                    "headers": headers,
+                }
+                _logger.error(error_payload)
                 raise TrackimoAPIError(
                     "Trackimo API error.",
                     response.status_code,
