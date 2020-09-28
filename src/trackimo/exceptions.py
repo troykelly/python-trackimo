@@ -15,9 +15,12 @@ also be used as template for Python modules.
 Note: This skeleton file can be safely removed if not needed!
 """
 
+
 class Error(Exception):
     """Base class for exceptions in this module."""
+
     pass
+
 
 class MissingInformation(Error):
     """Exception raised if there is insufficient information to continue
@@ -29,6 +32,7 @@ class MissingInformation(Error):
     def __init__(self, message):
         super().__init__()
         self.message = message
+
 
 class UnableToAuthenticate(Error):
     """Execption raised when the login process can not complete
@@ -43,6 +47,7 @@ class UnableToAuthenticate(Error):
         self.message = message
         self.status_code = status_code
 
+
 class NoSession(Error):
     """Execption raised when there is no existing API session
 
@@ -53,6 +58,7 @@ class NoSession(Error):
     def __init__(self, message):
         super().__init__()
         self.message = message
+
 
 class CanNotRefresh(Error):
     """Execption raised when trying to refresh a token fails
@@ -65,8 +71,29 @@ class CanNotRefresh(Error):
         super().__init__()
         self.message = message
 
-class TrackimoAPI(Error):
+
+class TrackimoAPIError(Error):
     """Exception raised when trasacting with the Trackimo API
+
+    Attributes:
+        message (str): explanation of the error
+        status_code (int): HTTP Status Code returned
+        body (str): Message body
+        json (object): Data returned
+        headers (object): Response headers
+    """
+
+    def __init__(self, message, status_code=None, body=None, json=None, headers=None):
+        super().__init__()
+        self.message = message
+        self.status_code = status_code
+        self.body = body
+        self.json = json
+        self.headers = headers
+
+
+class TrackimoAccessDenied(Error):
+    """Exception raised when permission is denied at the Trackimo API
 
     Attributes:
         message (str): explanation of the error

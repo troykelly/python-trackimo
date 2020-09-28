@@ -18,7 +18,8 @@ from ..exceptions import (
     UnableToAuthenticate,
     NoSession,
     CanNotRefresh,
-    TrackimoAPI,
+    TrackimoAPIError,
+    TrackimoAccessDenied,
 )
 
 _logger = logging.getLogger(__name__)
@@ -174,13 +175,13 @@ class Protocol(object):
 
         try:
             data = await self.api_get("oauth2/auth", auth_payload)
-        except TrackimoAPI as apierror:
+        except TrackimoAPIError as apierror:
             raise UnableToAuthenticate(
                 "Could not proceed with authentication after login",
                 apierror.status_code,
             )
-        except:
-            raise Exception(sys.exc_info()[0])
+        except Exception as err:
+            raise err
 
         if not data or not "code" in data:
             raise UnableToAuthenticate(
@@ -190,12 +191,12 @@ class Protocol(object):
         token_payload["code"] = data["code"]
         try:
             data = await self.api_post("oauth2/token", token_payload)
-        except TrackimoAPI as apierror:
+        except TrackimoAPIError as apierror:
             raise UnableToAuthenticate(
                 "Could not swap a code for a token", apierror.status_code
             )
-        except:
-            raise Exception(sys.exc_info()[0])
+        except Exception as err:
+            raise err
 
         if not data or not "access_token" in data:
             raise UnableToAuthenticate("Could not retrieve access token code from API")
@@ -243,11 +244,11 @@ class Protocol(object):
                 headers=None,
                 no_check=True,
             )
-        except TrackimoAPI as apierror:
+        except TrackimoAPIError as apierror:
             _logger.debug("Could not refresh. Trying to log in. %s", apierror.body)
             return await self.login()
-        except:
-            raise Exception(sys.exc_info()[0])
+        except Exception as err:
+            raise err
 
         if not data or not "access_token" in data:
             _logger.debug("Could not refresh. Trying to log in.")
@@ -293,11 +294,21 @@ class Protocol(object):
         no_check=False,
         use_internal_api=False,
     ):
+        """Make a request to the Trackimo API
+
+        Attributes:
+            method (str): The request verb ie GET PUT POST DELETE
+            path (str): The path of the API endpoint
+            data (object): Data to be passed as a querystring
+            headers (object): Any headers to be sent
+            no_check (bool): Don't check for an expired token
+            use_internal_api (bool): Use the alternate internal API endpoint
+        """
         if not self.__session:
             raise NoSession("There is no current API session. Please login() first.")
 
         if not no_check and (
-            self.__api_expires and datetime.now() > self.__api_expires
+            self.__api_expires and (datetime.now() > self.__api_expires)
         ):
             _logger.debug("Refreshing token, it has expired.")
             await self.__token_refresh()
@@ -328,31 +339,78 @@ class Protocol(object):
         if not no_check and self.__api_token:
             headers["Authorization"] = f"Bearer {self.__api_token}"
 
+        attempt = 0
+        attempts_max = 3
+
         def process_request():
+            nonlocal attempt
+            attempt += 1
             _logger.debug(
-                {"url": url, "params": params, "data": json, "headers": headers}
+                {
+                    "attempt": attempt,
+                    "url": url,
+                    "params": params,
+                    "data": json,
+                    "headers": headers,
+                }
             )
-            return self.__session.request(
+            response = self.__session.request(
                 method, url, params=params, json=json, headers=headers
             )
+            if not response:
+                raise TrackimoAPIError("Trackimo API failed to repond.")
 
-        future = self.__loop.run_in_executor(None, process_request)
-        response = await future
-
-        success = 200 <= response.status_code <= 299
-        try:
-            data = response.json()
-        except:
-            data = None
-        if not success:
             body = response.body if hasattr(response, "body") else None
-            raise TrackimoAPI(
-                "Trackimo API Call failed.",
-                response.status_code,
-                body,
-                data,
-                response.headers,
-            )
+            success = 200 <= response.status_code <= 299
+
+            try:
+                data = response.json()
+            except:
+                data = None
+
+            if response.status_code == 401 or response.status_code == 403:
+                raise TrackimoAccessDenied(
+                    "Trackimo API Access denied.",
+                    response.status_code,
+                    body,
+                    data,
+                    response.headers,
+                )
+
+            if not success:
+                raise TrackimoAPIError(
+                    "Trackimo API error.",
+                    response.status_code,
+                    body,
+                    data,
+                    response.headers,
+                )
+
+            return data
+
+        data = None
+        while attempt <= attempts_max:
+            try:
+                data = await self.__loop.run_in_executor(None, process_request)
+            except TrackimoAccessDenied as err:
+                _logger.exception(err)
+                _logger.error(err.status_code)
+                _logger.error(err.body)
+                _logger.error(err.json)
+                _logger.error(err.headers)
+                try:
+                    auth = await self.__token_refresh()
+                    continue
+                except Exception as refreshError:
+                    _logger.exception(refreshError)
+                    try:
+                        auth = await self.login()
+                        continue
+                    except Exception as loginError:
+                        raise loginError
+            except Exception as err:
+                raise err
+            break
 
         if not data:
             data = {}
