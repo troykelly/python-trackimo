@@ -135,7 +135,7 @@ class DeviceHandler(object):
             )
         return changed_devices
 
-    async def __track(self, interval=60, event_receiver=None):
+    async def __track(self, interval, event_receiver=None):
         while True:
             _logger.debug("track is checking for changes...")
             changed_devices = await self.__locations()
@@ -162,10 +162,14 @@ class DeviceHandler(object):
                             _logger.exception(err)
             await asyncio.sleep(interval)
 
-    def track(self, interval=60, event_receiver=None):
+    def track(self, interval=None, event_receiver=None):
         if not self.__protocol.loop:
             return None
-        _logger.debug("Tracking devices every %d seconds...", interval)
+        if not interval:
+            interval = datetime.timedelta(seconds=60)
+        if not isinstance(interval, datetime.timedelta):
+            interval = datetime.timedelta(seconds=interval)
+        _logger.debug("Tracking devices every %d seconds...", interval.total_seconds())
         return self.__protocol.loop.create_task(
             self.__track(interval=interval, event_receiver=event_receiver)
         )
