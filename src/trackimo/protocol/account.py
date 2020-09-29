@@ -13,7 +13,7 @@ class AccountHandler(object):
         super().__init__()
         self.__protocol = protocol
 
-    async def get(self):
+    async def build(self):
         data = await self.__protocol.api_get(f"accounts/{self.__protocol.accountid}")
 
         if not data:

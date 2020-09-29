@@ -34,8 +34,8 @@ class Trackimo(object):
         accountHandler = account.AccountHandler(self.__protocol)
         deviceHandler = device.DeviceHandler(self.__protocol)
 
-        self.__account = await accountHandler.get()
-        self.__devices = await deviceHandler.get()
+        self.__account = await accountHandler.build()
+        self.__devices = await deviceHandler.build()
 
         self.__track = deviceHandler.track
 
@@ -64,8 +64,8 @@ class Trackimo(object):
         accountHandler = account.AccountHandler(self.__protocol)
         deviceHandler = device.DeviceHandler(self.__protocol)
 
-        self.__account = await accountHandler.get()
-        self.__devices = await deviceHandler.get()
+        self.__account = await accountHandler.build()
+        self.__devices = await deviceHandler.build()
 
         self.__track = deviceHandler.track
 
