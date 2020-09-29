@@ -446,15 +446,15 @@ class Device(object):
 
     @property
     def id(self):
-        if not self.__id:
+        if not (hasattr(self, "__id") and self.__id):
             return None
         return self.__id
 
     @property
     def changed(self):
-        if not self.__changed:
-            return False
-        return True
+        if hasattr(self, "__changed") and self.__changed:
+            return True
+        return False
 
     @property
     def location(self):
@@ -481,7 +481,8 @@ class Device(object):
     @property
     def attribution(self):
         if (
-            self.__address
+            hasattr(self, "__address")
+            and self.__address
             and "raw" in self.__address
             and "licence" in self.__address["raw"]
         ):
@@ -490,98 +491,135 @@ class Device(object):
 
     @property
     def address(self):
-        if self.__address and "address" in self.__address:
+        if (
+            hasattr(self, "__address")
+            and self.__address
+            and "address" in self.__address
+        ):
             return self.__address["address"]
         return None
 
     @property
     def city(self):
-        if self.__address and "city" in self.__address:
+        if hasattr(self, "__address") and self.__address and "city" in self.__address:
             return self.__address["city"]
         return None
 
     @property
     def country(self):
-        if self.__address and "country" in self.__address:
+        if (
+            hasattr(self, "__address")
+            and self.__address
+            and "country" in self.__address
+        ):
             return self.__address["country"]
         return None
 
     @property
     def postalcode(self):
-        if self.__address and "postal" in self.__address:
+        if hasattr(self, "__address") and self.__address and "postal" in self.__address:
             return self.__address["postal"]
         return None
 
     @property
     def region(self):
-        if self.__address and "region" in self.__address:
+        if hasattr(self, "__address") and self.__address and "region" in self.__address:
             return self.__address["region"]
         return None
 
     @property
     def state(self):
-        if self.__address and "state" in self.__address:
+        if hasattr(self, "__address") and self.__address and "state" in self.__address:
             return self.__address["state"]
         return None
 
     @property
     def street(self):
-        if self.__address and "street" in self.__address:
+        if hasattr(self, "__address") and self.__address and "street" in self.__address:
             return self.__address["street"]
         return None
 
     @property
     def suburb(self):
-        if self.__address and "suburb" in self.__address:
+        if hasattr(self, "__address") and self.__address and "suburb" in self.__address:
             return self.__address["suburb"]
         return None
 
     @property
     def latitude(self):
-        if not (self.__latitude and self.__longitude):
+        if not (
+            hasattr(self, "__latitude")
+            and self.__latitude
+            and hasattr(self, "__longitude")
+            and self.__longitude
+        ):
             return None
         return self.__latitude
 
     @property
     def longitude(self):
-        if not (self.__latitude and self.__longitude):
+        if not (
+            hasattr(self, "__latitude")
+            and self.__latitude
+            and hasattr(self, "__longitude")
+            and self.__longitude
+        ):
             return None
         return self.__longitude
 
     @property
     def altitude(self):
-        if not self.__altitude:
+        if not (hasattr(self, "__altitude") and self.__altitude):
             return None
         return self.__altitude
 
     @property
     def updated(self):
-        if not (self.__latitude and self.__longitude and self.__locationUpdated):
+        if not (
+            hasattr(self, "__latitude")
+            and self.__latitude
+            and hasattr(self, "__longitude")
+            and self.__longitude
+            and hasattr(self, "__locationUpdated")
+            and self.__locationUpdated
+        ):
             return None
         return self.__locationUpdated
 
     @property
     def age(self):
-        if not (self.__latitude and self.__longitude and self.__locationUpdated):
+        if not (
+            hasattr(self, "__latitude")
+            and self.__latitude
+            and hasattr(self, "__longitude")
+            and self.__longitude
+            and hasattr(self, "__locationUpdated")
+            and self.__locationUpdated
+        ):
             return None
         time_delta = datetime.now() - self.__locationUpdated
         return round(time_delta.total_seconds())
 
     @property
     def battery(self):
-        if not self.__battery:
+        if not (hasattr(self, "__battery") and self.__battery):
             return None
         return self.__battery
 
     @property
     def locationType(self):
-        if not self.__locationType:
+        if not (hasattr(self, "__locationType") and self.__locationType):
             return None
         return self.__locationType
 
     @property
     def speedKMH(self):
-        if not (self.__speed and self.__speedUnit):
+        if not (
+            hasattr(self, "__speedUnit")
+            and self.__speedUnit
+            and hasattr(self, "__speed")
+            and self.__speed
+        ):
             return None
         if self.__speedUnit.lower() == "kph":
             return self.__speed
@@ -591,7 +629,12 @@ class Device(object):
 
     @property
     def speedMPH(self):
-        if not (self.__speed and self.__speedUnit):
+        if not (
+            hasattr(self, "__speedUnit")
+            and self.__speedUnit
+            and hasattr(self, "__speed")
+            and self.__speed
+        ):
             return None
         if self.__speedUnit.lower() == "mph":
             return self.__speed
@@ -601,7 +644,12 @@ class Device(object):
 
     @property
     def speedMPS(self):
-        if not (self.__speed and self.__speedUnit):
+        if not (
+            hasattr(self, "__speedUnit")
+            and self.__speedUnit
+            and hasattr(self, "__speed")
+            and self.__speed
+        ):
             return None
         if self.__speedUnit.lower() == "mph":
             return self.__speed / 2.237
@@ -611,55 +659,57 @@ class Device(object):
 
     @property
     def triangulated(self):
-        if not self.__locationTriangulated:
+        if not (
+            hasattr(self, "__locationTriangulated") and self.__locationTriangulated
+        ):
             return None
         return self.__locationTriangulated
 
     @property
     def imsi(self):
-        if not self.__imsi:
+        if not (hasattr(self, "__imsi") and self.__imsi):
             return None
         return self.__imsi
 
     @property
     def msisdn(self):
-        if not self.__msisdn:
+        if not (hasattr(self, "__msisdn") and self.__msisdn):
             return None
         return self.__msisdn
 
     @property
     def name(self):
-        if not self.__name:
+        if not (hasattr(self, "__name") and self.__name):
             return None
         return self.__name
 
     @property
     def status(self):
-        if not self.__status:
+        if not (hasattr(self, "__status") and self.__status):
             return None
         return self.__status
 
     @property
     def typeName(self):
-        if not self.__type:
+        if not (hasattr(self, "__type") and self.__type):
             return None
         return self.__type
 
     @property
     def typeId(self):
-        if not self.__typeId:
+        if not (hasattr(self, "__typeId") and self.__typeId):
             return None
         return self.__typeId
 
     @property
     def iconId(self):
-        if not self.__iconId:
+        if not (hasattr(self, "__iconId") and self.__iconId):
             return None
         return self.__iconId
 
     @property
     def features(self):
-        if not self.__features:
+        if not (hasattr(self, "__features") and self.__features):
             return None
         return self.__features
 
