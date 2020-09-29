@@ -160,19 +160,25 @@ class DeviceHandler(object):
                             )
                         except Exception as err:
                             _logger.exception(err)
-            await asyncio.sleep(interval)
+            await asyncio.sleep(interval.total_seconds())
 
     def track(self, interval=None, event_receiver=None):
         if not self.__protocol.loop:
             return None
+
         if not interval:
-            interval = datetime.timedelta(seconds=60)
-        if not isinstance(interval, datetime.timedelta):
-            interval = datetime.timedelta(seconds=interval)
+            interval = timedelta(seconds=60)
+
+        if not isinstance(interval, timedelta):
+            interval = timedelta(seconds=interval)
+
         _logger.debug("Tracking devices every %d seconds...", interval.total_seconds())
-        return self.__protocol.loop.create_task(
+
+        task = self.__protocol.loop.create_task(
             self.__track(interval=interval, event_receiver=event_receiver)
         )
+
+        return task
 
 
 class Device(object):
