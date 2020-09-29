@@ -26,7 +26,7 @@ class Trackimo(object):
             password=None,
             loop=self.__loop,
         )
-        _logger.debug("Have protocol")
+
         authData = await self.__protocol.restore_session(refresh_token)
         if not authData:
             raise UnableToAuthenticate("Not authenticated with Trackimo API")
@@ -36,6 +36,8 @@ class Trackimo(object):
 
         self.__account = await accountHandler.get()
         self.__devices = await deviceHandler.get()
+
+        self.__track = deviceHandler.track
 
         return self
 
@@ -65,6 +67,8 @@ class Trackimo(object):
         self.__account = await accountHandler.get()
         self.__devices = await deviceHandler.get()
 
+        self.__track = deviceHandler.track
+
         return self
 
     @property
@@ -87,3 +91,10 @@ class Trackimo(object):
             _logger.error("No account details. Make sure to login() first.")
             return {}
         return self.__account
+
+    @property
+    def track(self):
+        if not self.__track:
+            _logger.error("Unable to track, no devices available.")
+            return None
+        return self.__track

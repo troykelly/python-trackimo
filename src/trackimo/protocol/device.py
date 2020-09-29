@@ -8,6 +8,7 @@ import sys
 import os
 from datetime import datetime, timedelta
 import geocoder
+import asyncio
 
 _logger = logging.getLogger(__name__)
 
@@ -26,6 +27,12 @@ class DeviceHandler(object):
             return None
         return self.__protocol.loop
 
+    @property
+    def __list(self):
+        if not self.__devices:
+            return []
+        return [*self.__devices]
+
     async def get(self, limit=20, page=1):
         allDevices = await self.__listall(limit=limit, page=page)
         while allDevices:
@@ -36,6 +43,7 @@ class DeviceHandler(object):
                     await self.__devices[id].get()
             page += 1
             allDevices = await self.__listall(limit=limit, page=page)
+        await self.__locations()
         return self.__devices
 
     async def __listall(self, limit=20, page=1):
@@ -101,6 +109,67 @@ class DeviceHandler(object):
             path="devices/features/deviceIds", data=options, use_internal_api=True
         )
 
+    async def __locations(self):
+        device_ids = self.__list
+        changed_devices = list()
+        pagination = {"limit": len(device_ids), "page": 1}
+        url = f"accounts/{self.__protocol.accountid}/locations/filter"
+        location_data = await self.__protocol.api_post(
+            url, data={"device_ids": device_ids}, query_string=pagination
+        )
+        while location_data:
+            pagination["page"] += 1
+            _logger.debug(location_data)
+            for device_location_data in location_data:
+                if (
+                    "device_id" in device_location_data
+                    and device_location_data["device_id"] in self.__devices
+                ):
+                    await self.__devices[
+                        device_location_data["device_id"]
+                    ].location_event(device_location_data)
+                    if self.__devices[device_location_data["device_id"]].changed:
+                        changed_devices.append(device_location_data["device_id"])
+            location_data = await self.__protocol.api_post(
+                url, data={"device_ids": device_ids}, query_string=pagination
+            )
+        return changed_devices
+
+    async def __track(self, interval=60, event_receiver=None):
+        while True:
+            _logger.debug("track is checking for changes...")
+            changed_devices = await self.__locations()
+            if changed_devices:
+                _logger.debug(
+                    "Devices changed: %s", ", ".join(map(str, changed_devices))
+                )
+                if event_receiver:
+                    for device_id in changed_devices:
+                        device = self.__devices[device_id]
+                        try:
+                            event_receiver(
+                                event_type="location",
+                                device_id=device_id,
+                                device=device,
+                                ts=datetime.now(),
+                            )
+                            _logger.debug(
+                                "Change sent to event handler for %s (%d)",
+                                device.name,
+                                device.id,
+                            )
+                        except Exception as err:
+                            _logger.exception(err)
+            await asyncio.sleep(interval)
+
+    def track(self, interval=60, event_receiver=None):
+        if not self.__protocol.loop:
+            return None
+        _logger.debug("Tracking devices every %d seconds...", interval)
+        return self.__protocol.loop.create_task(
+            self.__track(interval=interval, event_receiver=event_receiver)
+        )
+
 
 class Device(object):
     def __init__(self, handler, id=None):
@@ -109,83 +178,162 @@ class Device(object):
             self.__handler = handler
         if id:
             self.__id = id
+            self.__previous_latitude = None
+            self.__previous_longitude = None
+            self.__previous_altitude = None
+            self.__previous_battery = None
+            self.__previous_hdop = None
+            self.__previous_gps = None
+            self.__previous_locationTriangulated = None
+            self.__previous_locationType = None
 
-    async def refresh(self):
+    async def location_event(self, location_data):
         if not self.__id:
             return
-        locationData = await self.__handler.location(self.__id)
-        if locationData:
-            self.__locationUpdated = (
-                datetime.fromtimestamp(int(locationData["updated"]) / 1000.0)
-                if "updated" in locationData and locationData["updated"]
-                else None
-            )
+        _logger.debug("Updating device %d location data: %s", self.__id, location_data)
+        if location_data:
+            if "time" in location_data:
+                self.__locationUpdated = datetime.fromtimestamp(
+                    int(location_data["time"])
+                )
+            elif "updated" in location_data:
+                self.__locationUpdated = datetime.fromtimestamp(
+                    int(location_data["updated"]) / 1000.0
+                )
+            else:
+                self.__locationUpdated = None
             self.__locationAge = (
-                int(locationData["age"])
-                if "age" in locationData and locationData["age"]
+                int(location_data["age"])
+                if "age" in location_data and location_data["age"]
                 else None
             )
             self.__altitude = (
-                float(locationData["altitude"])
-                if "altitude" in locationData and locationData["altitude"]
+                float(location_data["altitude"])
+                if "altitude" in location_data and location_data["altitude"]
                 else None
             )
             self.__battery = (
-                int(locationData["battery"])
-                if "battery" in locationData and locationData["battery"]
+                int(location_data["battery"])
+                if "battery" in location_data and location_data["battery"]
                 else None
             )
-            self.__locationType = (
-                locationData["type"]
-                if "type" in locationData and locationData["type"]
+            self.__gps = (
+                location_data["gps"]
+                if "gps" in location_data and location_data["gps"]
+                else False
+            )
+            self.__hdop = (
+                float(location_data["hdop"])
+                if "hdop" in location_data and location_data["hdop"]
                 else None
             )
             self.__latitude = (
-                float(locationData["lat"])
-                if "lat" in locationData and locationData["lat"]
+                float(location_data["lat"])
+                if "lat" in location_data and location_data["lat"]
                 else None
             )
             self.__longitude = (
-                float(locationData["lng"])
-                if "lng" in locationData and locationData["lng"]
+                float(location_data["lng"])
+                if "lng" in location_data and location_data["lng"]
                 else None
             )
+            self.__location_id = (
+                int(location_data["location_id"])
+                if "location_id" in location_data
+                and location_data["location_id"]
+                and location_data["location_id"] != -1
+                else None
+            )
+            self.__manual_location = (
+                location_data["manual_location"]
+                if "manual_location" in location_data
+                and location_data["manual_location"]
+                else False
+            )
+            self.__moving = (
+                location_data["moving"]
+                if "moving" in location_data and location_data["moving"]
+                else False
+            )
             self.__speed = (
-                float(locationData["speed"])
-                if "speed" in locationData
-                and locationData["speed"]
-                or locationData["speed"] == 0
+                float(location_data["speed"])
+                if "speed" in location_data
+                and location_data["speed"]
+                or location_data["speed"] == 0
                 else None
             )
             self.__speedUnit = (
-                locationData["speed_unit"]
-                if "speed_unit" in locationData and locationData["speed_unit"]
+                location_data["speed_unit"]
+                if "speed_unit" in location_data and location_data["speed_unit"]
                 else None
             )
             self.__locationTriangulated = (
-                locationData["is_triangulated"]
-                if "is_triangulated" in locationData and locationData["is_triangulated"]
+                location_data["is_triangulated"]
+                if "is_triangulated" in location_data
+                and location_data["is_triangulated"]
                 else False
+            )
+            self.__locationType = (
+                location_data["type"]
+                if "type" in location_data and location_data["type"]
+                else None
             )
         else:
             self.__locationUpdated = None
             self.__locationAge = None
             self.__altitude = None
             self.__battery = None
-            self.__locationType = None
+            self.__gps = None
+            self.__hdop = None
             self.__latitude = None
             self.__longitude = None
+            self.__location_id = None
+            self.__manual_location = None
+            self.__moving = None
             self.__speed = None
             self.__speedUnit = None
             self.__locationTriangulated = None
+            self.__locationType = None
 
-        geocode = await self.__reverseGeocode()
-        if geocode:
-            self.__address = geocode
-        else:
-            self.__address = None
-
+        await self.__reverseGeocode()
+        self.__changed = self.__check_changed()
         return self.location
+
+    def __check_changed(self):
+        changed = False
+        if not self.__previous_latitude == self.__latitude:
+            changed = True
+        if not self.__previous_longitude == self.__longitude:
+            changed = True
+        if not self.__previous_altitude == self.__altitude:
+            changed = True
+        if not self.__previous_battery == self.__battery:
+            changed = True
+        if not self.__previous_hdop == self.__hdop:
+            changed = True
+        if not self.__previous_gps == self.__gps:
+            changed = True
+        if not self.__previous_locationTriangulated == self.__locationTriangulated:
+            changed = True
+        if not self.__previous_locationType == self.__locationType:
+            changed = True
+
+        self.__previous_latitude = self.__latitude
+        self.__previous_longitude = self.__longitude
+        self.__previous_altitude = self.__altitude
+        self.__previous_battery = self.__battery
+        self.__previous_hdop = self.__hdop
+        self.__previous_gps = self.__gps
+        self.__previous_locationTriangulated = self.__locationTriangulated
+        self.__previous_locationType = self.__locationType
+
+        return changed
+
+    async def refresh(self):
+        if not self.__id:
+            return
+        location_data = await self.__handler.location(self.__id)
+        return await self.location_event(location_data)
 
     async def __reverseGeocode(self):
         global GEO_CACHE
@@ -200,12 +348,18 @@ class Device(object):
         def getGeoData():
             return geocoder.osm(location, method="reverse")
 
-        future = self.__handler.loop.run_in_executor(None, getGeoData)
-        g = await future
+        try:
+            g = await self.__handler.loop.run_in_executor(None, getGeoData)
+        except Exception as err:
+            _logger.error("Geocoder unavailable")
+            _logger.error(err)
 
-        if not g:
+        if not g and g.json:
+            self.__address = None
             return None
+
         GEO_CACHE[location_text] = g.json
+        self.__address = GEO_CACHE[location_text]
         return GEO_CACHE[location_text]
 
     async def get(self):
@@ -269,8 +423,6 @@ class Device(object):
             self.__userId = None
             self.__iconId = None
 
-        await self.refresh()
-
         return self
 
     async def beep(self, period=2, sound=1):
@@ -288,6 +440,7 @@ class Device(object):
         features_data = await self.__handler.get_features(self.__id)
         if not features_data:
             return None
+        _logger.debug("Updating device %d features data: %s", self.__id, features_data)
         self.__features = Features(features_data)
         return self.__features
 
@@ -296,6 +449,12 @@ class Device(object):
         if not self.__id:
             return None
         return self.__id
+
+    @property
+    def changed(self):
+        if not self.__changed:
+            return False
+        return True
 
     @property
     def location(self):

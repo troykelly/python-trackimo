@@ -293,6 +293,7 @@ class Protocol(object):
         headers={},
         no_check=False,
         use_internal_api=False,
+        query_string={},
     ):
         """Make a request to the Trackimo API
 
@@ -324,19 +325,27 @@ class Protocol(object):
         params = None
 
         if method == "GET":
-            if data:
+            if data and not query_string:
                 params = data
+            elif query_string:
+                params = query_string
         elif method == "POST":
             if data:
                 json = data
+            if query_string:
+                params = query_string
         elif method == "DELETE":
             if data:
                 json = data
+            if query_string:
+                params = query_string
         elif method == "PUT":
             if data:
                 json = data
+            if query_string:
+                params = query_string
 
-        if not no_check and self.__api_token:
+        if self.__api_token and not no_check:
             headers["Authorization"] = f"Bearer {self.__api_token}"
 
         attempt = 0
@@ -354,10 +363,18 @@ class Protocol(object):
                     "headers": headers,
                 }
             )
-            response = self.__session.request(
-                method, url, params=params, json=json, headers=headers
-            )
-            if not response:
+            try:
+                response = self.__session.request(
+                    method, url, params=params, json=json, headers=headers
+                )
+            except Exception as err:
+                _logger.error("No response at all")
+                _logger.error(err)
+
+            if not hasattr(response, "status_code"):
+                _logger.error("Empty Response")
+                _logger.error(response)
+                _logger.error(response.__dict__)
                 raise TrackimoAPIError("Trackimo API failed to repond.")
 
             body = response.body if hasattr(response, "body") else None
@@ -390,6 +407,7 @@ class Protocol(object):
                     "body": body,
                     "data": data,
                     "headers": headers,
+                    "response_headers": response.headers,
                 }
                 _logger.error(error_payload)
                 raise TrackimoAPIError(
@@ -439,29 +457,29 @@ class Protocol(object):
         """
         return await self.api("GET", path=path, data=data)
 
-    async def api_post(self, path=None, data=None):
+    async def api_post(self, path=None, data=None, query_string=None):
         """Make a post request to the Trackimo API
 
         Attributes:
             path (str): The path of the API endpoint
             data (object): Data to be passed as a json payload
         """
-        return await self.api("POST", path=path, data=data)
+        return await self.api("POST", path=path, data=data, query_string=query_string)
 
-    async def api_delete(self, path=None, data=None):
+    async def api_delete(self, path=None, data=None, query_string=None):
         """Make a delete request to the Trackimo API
 
         Attributes:
             path (str): The path of the API endpoint
             data (object): Data to be passed as a json payload
         """
-        return await self.api("DELETE", path=path, data=data)
+        return await self.api("DELETE", path=path, data=data, query_string=query_string)
 
-    async def api_put(self, path=None, data=None):
+    async def api_put(self, path=None, data=None, query_string=None):
         """Make a put request to the Trackimo API
 
         Attributes:
             path (str): The path of the API endpoint
             data (object): Data to be passed as a json payload
         """
-        return await self.api("PUT", path=path, data=data)
+        return await self.api("PUT", path=path, data=data, query_string=query_string)
