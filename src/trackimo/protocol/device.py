@@ -458,14 +458,23 @@ class Device(object):
 
     @property
     def location(self):
-        if not (self.__latitude and self.__longitude):
+        if not (
+            hasattr(self, "__latitude")
+            and self.__latitude
+            and hasattr(self, "__longitude")
+            and self.__longitude
+        ):
             return None
         data = {"latitude": self.__latitude, "longitude": self.__longitude}
-        if self.__altitude:
+        if hasattr(self, "__altitude") and self.__altitude:
             data["altitude"] = self.__altitude
-        if self.__locationUpdated:
+        if hasattr(self, "__locationUpdated") and self.__locationUpdated:
             data["ts"] = self.__locationUpdated
-        if self.__address and "address" in self.__address:
+        if (
+            hasattr(self, "__address")
+            and self.__address
+            and "address" in self.__address
+        ):
             data["address"] = self.__address["address"]
         return data
 
