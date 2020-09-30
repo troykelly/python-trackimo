@@ -499,65 +499,92 @@ class Device(object):
     @property
     def attribution(self):
         try:
-            return self.__address["raw"]["licence"]
+            address = self.__address
         except AttributeError:
             return None
+        if "raw" in address and "licence" in address["raw"]:
+            return address["raw"]["licence"]
+        return None
 
     @property
     def address(self):
         try:
-            return self.__address["address"]
+            address = self.__address
         except AttributeError:
             return None
+        if "address" in address:
+            return address["address"]
+        return None
 
     @property
     def city(self):
         try:
-            return self.__address["city"]
+            address = self.__address
         except AttributeError:
             return None
+        if "city" in address:
+            return address["city"]
+        return None
 
     @property
     def country(self):
         try:
-            return self.__address["country"]
+            address = self.__address
         except AttributeError:
             return None
+        if "country" in address:
+            return address["country"]
+        return None
 
     @property
     def postalcode(self):
         try:
-            return self.__address["postal"]
+            address = self.__address
         except AttributeError:
             return None
+        if "postal" in address:
+            return address["postal"]
+        return None
 
     @property
     def region(self):
         try:
-            return self.__address["region"]
+            address = self.__address
         except AttributeError:
             return None
+        if "region" in address:
+            return address["region"]
+        return None
 
     @property
     def state(self):
         try:
-            return self.__address["state"]
+            address = self.__address
         except AttributeError:
             return None
+        if "state" in address:
+            return address["state"]
+        return None
 
     @property
     def street(self):
         try:
-            return self.__address["street"]
+            address = self.__address
         except AttributeError:
             return None
+        if "street" in address:
+            return address["street"]
+        return None
 
     @property
     def suburb(self):
         try:
-            return self.__address["suburb"]
+            address = self.__address
         except AttributeError:
             return None
+        if "suburb" in address:
+            return address["suburb"]
+        return None
 
     @property
     def latitude(self):
