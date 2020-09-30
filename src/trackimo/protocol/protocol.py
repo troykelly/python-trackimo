@@ -9,6 +9,7 @@ import requests
 import os
 import asyncio
 import functools
+import backoff
 
 from datetime import datetime, timedelta
 from .user import UserHandler
@@ -20,11 +21,20 @@ from ..exceptions import (
     CanNotRefresh,
     TrackimoAPIError,
     TrackimoAccessDenied,
+    TrackimoLoginFailed,
 )
 
 _logger = logging.getLogger(__name__)
+logging.getLogger("backoff").addHandler(logging.StreamHandler())
 
 
+def fatal_code(e):
+    return 400 <= e.response.status_code < 500
+
+
+@backoff.on_exception(
+    backoff.expo, requests.exceptions.RequestException, max_time=300, giveup=fatal_code
+)
 class Protocol(object):
     def __init__(
         self,
@@ -134,6 +144,11 @@ class Protocol(object):
         if not (self.__trackimo_username and self.__trackimo_password):
             raise UnableToAuthenticate("Must have a username and password available")
 
+        self.__session = None
+        self.__api_token = None
+        self.__api_expires = None
+        self.__refresh_token = None
+
         self.__session = requests.Session()
 
         login_payload = {
@@ -162,38 +177,79 @@ class Protocol(object):
             )
 
         try:
-            future = self.__loop.run_in_executor(None, send_login_payload)
+            response = await self.__loop.run_in_executor(None, send_login_payload)
         except Exception as err:
             raise err
 
-        response = await future
+        status_code = getattr(response, "status_code", None)
 
-        if not response.status_code == 200:
-            raise UnableToAuthenticate(
-                "Could not authenticate with login endpoint", response.status_code
+        if status_code != 200:
+            raise TrackimoLoginFailed(
+                "Trackimo API Rejecting Credentials",
+                status_code=status_code,
+                response=response,
             )
 
         try:
-            data = await self.api_get("oauth2/auth", auth_payload)
+            data = await self.api(
+                method="GET",
+                path="oauth2/auth",
+                data=auth_payload,
+                headers=None,
+                no_check=True,
+            )
+        except TrackimoAccessDenied as apierror:
+            raise TrackimoLoginFailed(
+                "Trackimo API Rejecting token exchange",
+                status_code=apierror.status_code,
+                body=apierror.body,
+                json=apierror.json,
+                headers=apierror.headers,
+                response=apierror.response,
+            )
         except TrackimoAPIError as apierror:
-            raise UnableToAuthenticate(
-                "Could not proceed with authentication after login",
-                apierror.status_code,
+            raise TrackimoLoginFailed(
+                "Trackimo API error response",
+                status_code=apierror.status_code,
+                body=apierror.body,
+                json=apierror.json,
+                headers=apierror.headers,
+                response=apierror.response,
             )
         except Exception as err:
             raise err
 
         if not data or not "code" in data:
-            raise UnableToAuthenticate(
-                "Could not retrieve authentication code from API"
+            raise TrackimoLoginFailed(
+                "Trackimo API missing oauth code",
             )
 
         token_payload["code"] = data["code"]
         try:
-            data = await self.api_post("oauth2/token", token_payload)
+            data = await self.api(
+                method="POST",
+                path="oauth2/token",
+                data=token_payload,
+                headers=None,
+                no_check=True,
+            )
+        except TrackimoAccessDenied as apierror:
+            raise TrackimoLoginFailed(
+                "Trackimo API Rejecting token exchange",
+                status_code=apierror.status_code,
+                body=apierror.body,
+                json=apierror.json,
+                headers=apierror.headers,
+                response=apierror.response,
+            )
         except TrackimoAPIError as apierror:
-            raise UnableToAuthenticate(
-                "Could not swap a code for a token", apierror.status_code
+            raise TrackimoLoginFailed(
+                "Trackimo API failure to exchange code",
+                status_code=apierror.status_code,
+                body=apierror.body,
+                json=apierror.json,
+                headers=apierror.headers,
+                response=apierror.response,
             )
         except Exception as err:
             raise err
@@ -245,7 +301,10 @@ class Protocol(object):
                 no_check=True,
             )
         except TrackimoAPIError as apierror:
-            _logger.debug("Could not refresh. Trying to log in. %s", apierror.body)
+            _logger.debug("API Error. Trying to log in. %s", apierror.body)
+            return await self.login()
+        except TrackimoAccessDenied as apierror:
+            _logger.debug("Refresh token rejected. Trying to log in. %s", apierror.body)
             return await self.login()
         except Exception as err:
             raise err
@@ -284,6 +343,60 @@ class Protocol(object):
         self.__user = user
         self.__trackimo_accountid = user.accountId
         return user
+
+    def __request(self, method="GET", url=None, params=None, json=None, headers=None):
+
+        _logger.debug(
+            {
+                "url": url,
+                "params": params,
+                "data": json,
+                "headers": headers,
+            }
+        )
+
+        try:
+            response = self.__session.request(
+                method, url, params=params, json=json, headers=headers
+            )
+        except Exception as err:
+            _logger.error("No response at all")
+            _logger.exception(err)
+
+        status_code = getattr(response, "status_code", None)
+        body = getattr(response, "body", None)
+
+        try:
+            data = response.json()
+        except:
+            data = None
+
+        if not status_code:
+            raise TrackimoAPIError("Trackimo API failed to repond.", response=response)
+
+        success = 200 <= response.status_code <= 299
+
+        if response.status_code == 401 or response.status_code == 403:
+            raise TrackimoAccessDenied(
+                "Trackimo API Access Denied",
+                status_code=response.status_code,
+                body=body,
+                json=data,
+                headers=response.headers,
+                response=response,
+            )
+
+        if not success:
+            raise TrackimoAPIError(
+                "Trackimo API Error",
+                status_code=response.status_code,
+                body=body,
+                json=data,
+                headers=response.headers,
+                response=response,
+            )
+
+        return data
 
     async def api(
         self,
@@ -348,101 +461,43 @@ class Protocol(object):
         if self.__api_token and not no_check:
             headers["Authorization"] = f"Bearer {self.__api_token}"
 
-        attempt = 0
-        attempts_max = 3
-
-        def process_request():
-            nonlocal attempt
-            attempt += 1
-            _logger.debug(
-                {
-                    "attempt": attempt,
-                    "url": url,
-                    "params": params,
-                    "data": json,
-                    "headers": headers,
-                }
-            )
-            try:
-                response = self.__session.request(
-                    method, url, params=params, json=json, headers=headers
-                )
-            except Exception as err:
-                _logger.error("No response at all")
-                _logger.error(err)
-
-            if not hasattr(response, "status_code"):
-                _logger.error("Empty Response")
-                _logger.error(response)
-                _logger.error(response.__dict__)
-                raise TrackimoAPIError("Trackimo API failed to repond.")
-
-            body = response.body if hasattr(response, "body") else None
-            success = 200 <= response.status_code <= 299
-
-            try:
-                data = response.json()
-            except:
-                data = None
-
-            if response.status_code == 401 or response.status_code == 403:
-                error_payload = {
-                    "status": response.status_code,
-                    "body": body,
-                    "data": data,
-                    "headers": headers,
-                }
-                _logger.error(error_payload)
-                raise TrackimoAccessDenied(
-                    "Trackimo API Access denied.",
-                    response.status_code,
-                    body,
-                    data,
-                    response.headers,
-                )
-
-            if not success:
-                error_payload = {
-                    "status": response.status_code,
-                    "body": body,
-                    "data": data,
-                    "headers": headers,
-                    "response_headers": response.headers,
-                }
-                _logger.error(error_payload)
-                raise TrackimoAPIError(
-                    "Trackimo API error.",
-                    response.status_code,
-                    body,
-                    data,
-                    response.headers,
-                )
-
-            return data
-
         data = None
-        while attempt <= attempts_max:
+
+        def process_request(method, url, params, json, headers):
+            return self.__request(
+                method=method, url=url, params=params, json=json, headers=headers
+            )
+
+        try:
+            data = await self.__loop.run_in_executor(
+                None, process_request, method, url, params, json, headers
+            )
+        except TrackimoAccessDenied as err:
+            if no_check:
+                raise TrackimoAccessDenied(
+                    "Trackimo API Access Denied",
+                    status_code=err.status_code,
+                    body=err.body,
+                    json=err.json,
+                    headers=err.headers,
+                    response=err.response,
+                )
+            _logger.debug("Access Denied. Need to refresh token.")
             try:
-                data = await self.__loop.run_in_executor(None, process_request)
-            except TrackimoAccessDenied as err:
-                _logger.exception(err)
-                _logger.error(err.status_code)
-                _logger.error(err.body)
-                _logger.error(err.json)
-                _logger.error(err.headers)
-                try:
-                    auth = await self.__token_refresh()
-                    continue
-                except Exception as refreshError:
-                    _logger.exception(refreshError)
-                    try:
-                        auth = await self.login()
-                        continue
-                    except Exception as loginError:
-                        raise loginError
+                auth = await self.__token_refresh()
+            except Exception as refreshError:
+                raise refreshError
+
+            _logger.debug("Retrying request after re-auth")
+            try:
+                data = await self.__loop.run_in_executor(
+                    None, process_request, method, url, params, json, headers
+                )
             except Exception as err:
                 raise err
-            break
+
+        except Exception as err:
+            raise err
 
         if not data:
             data = {}

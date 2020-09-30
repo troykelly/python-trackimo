@@ -40,12 +40,14 @@ class UnableToAuthenticate(Error):
     Attributes:
         message (str): explanation of the error
         status_code (int): the status code returned from the api
+        response (object): Response object
     """
 
-    def __init__(self, message, status_code=None):
+    def __init__(self, message, status_code=None, response=None):
         super().__init__()
         self.message = message
         self.status_code = status_code
+        self.response = response
 
 
 class NoSession(Error):
@@ -65,11 +67,13 @@ class CanNotRefresh(Error):
 
     Attributes:
         message (str): explanation of the error
+        response (object): Response object
     """
 
-    def __init__(self, message):
+    def __init__(self, message, response=None):
         super().__init__()
         self.message = message
+        self.response = response
 
 
 class TrackimoAPIError(Error):
@@ -81,15 +85,25 @@ class TrackimoAPIError(Error):
         body (str): Message body
         json (object): Data returned
         headers (object): Response headers
+        response (object): Response object
     """
 
-    def __init__(self, message, status_code=None, body=None, json=None, headers=None):
+    def __init__(
+        self,
+        message,
+        status_code=None,
+        body=None,
+        json=None,
+        headers=None,
+        response=None,
+    ):
         super().__init__()
         self.message = message
         self.status_code = status_code
         self.body = body
         self.json = json
         self.headers = headers
+        self.response = response
 
 
 class TrackimoAccessDenied(Error):
@@ -101,12 +115,52 @@ class TrackimoAccessDenied(Error):
         body (str): Message body
         json (object): Data returned
         headers (object): Response headers
+        response (object): Response object
     """
 
-    def __init__(self, message, status_code=None, body=None, json=None, headers=None):
+    def __init__(
+        self,
+        message,
+        status_code=None,
+        body=None,
+        json=None,
+        headers=None,
+        response=None,
+    ):
         super().__init__()
         self.message = message
         self.status_code = status_code
         self.body = body
         self.json = json
         self.headers = headers
+        self.response = response
+
+
+class TrackimoLoginFailed(Error):
+    """Exception raised when unable to login to Trackimo API
+
+    Attributes:
+        message (str): explanation of the error
+        status_code (int): HTTP Status Code returned
+        body (str): Message body
+        json (object): Data returned
+        headers (object): Response headers
+        response (object): Response object
+    """
+
+    def __init__(
+        self,
+        message,
+        status_code=None,
+        body=None,
+        json=None,
+        headers=None,
+        response=None,
+    ):
+        super().__init__()
+        self.message = message
+        self.status_code = status_code
+        self.body = body
+        self.json = json
+        self.headers = headers
+        self.response = response
