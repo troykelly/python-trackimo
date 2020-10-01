@@ -16,6 +16,5 @@
 # scipy==1.0
 #
 requests==2.24.0
-geocoder==1.38.1
 backoff==1.10.0
 shapely==1.7.1
