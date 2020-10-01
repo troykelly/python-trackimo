@@ -1,15 +1,15 @@
 ========
 trackimo
 ========
+![Build and Publish to PyPI](https://github.com/troykelly/python-trackimo/workflows/Publish%20Python%20%F0%9F%90%8D%20distributions%20%F0%9F%93%A6%20to%20PyPI%20and%20TestPyPI/badge.svg?branch=master)
 
-
-Add a short description here!
+A trackimo library for (basically) exclusive use in Home Assistant.
 
 
 Description
 ===========
 
-A longer description of your project goes here...
+Supporting the Home Assistant Trackimo integration https://github.com/troykelly/hacs-trackimo
 
 
 Note

@@ -54,7 +54,7 @@ async def reverse_geocode(device):
     from_cache = getattr(__GEO_CACHE, point_id, None)
 
     if from_cache:
-        return from_cache["data"]
+        return from_cache["address"]
 
     def get_nominatim_reverse():
         session = get_session()
