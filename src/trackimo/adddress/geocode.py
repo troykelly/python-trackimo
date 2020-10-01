@@ -7,7 +7,6 @@ from datetime import datetime
 import json
 import logging
 import requests
-from shapely.geometry import Point, Polygon
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -309,3 +308,63 @@ class OSMReverseFailed(Exception):
         super().__init__()
         self.message = message
         self.response = response
+
+
+class Point(object):
+    """Standin because shapely can't be installed in Home Assistant"""
+
+    def __init__(self, x, y):
+        """Create a Point Object
+
+        Attributes:
+            x (float): The X co-ordinate
+            y (float): The Y co-ordinate
+        """
+        super().__init__()
+        self.__x = float(x)
+        self.__y = float(y)
+
+    def __repr__(self):
+        return self.wkt
+
+    @property
+    def coords(self):
+        return [self.__x, self.__y]
+
+    @property
+    def x(self):
+        return self.__x
+
+    @property
+    def y(self):
+        return self.__y
+
+    @property
+    def wkt(self):
+        return "POINT (" + str(self.__x) + " " + str(self.__y) + ")"
+
+
+class Polygon(object):
+    """Standin because shapely can't be installed in Home Assistant"""
+
+    def __init__(self, coordinates):
+        """Create a Polygon Object
+
+        Attributes:
+            coordinates (list):  A list of X,Y coordinates to generate the polygon
+        """
+        super().__init__()
+        self.__coordinates = coordinates
+
+    def __repr__(self):
+        return self.wkt
+
+    @property
+    def wkt(self):
+        response = "POLYGON (("
+        for idx, coordinate in enumerate(self.__coordinates, start=1):
+            if idx > 1:
+                response += ", "
+            response += str(coordinate[0]) + " " + str(coordinate[1])
+        response += "))"
+        return response
