@@ -15,6 +15,6 @@
 # numpy==1.13.3
 # scipy==1.0
 #
-requests==2.24.0
 backoff==1.10.0
+requests==2.24.0
 shapely==1.7.1

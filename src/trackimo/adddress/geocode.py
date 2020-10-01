@@ -4,18 +4,30 @@ Geocoder for Trackimo
 """
 
 from datetime import datetime
-import requests
 import json
 import logging
+import requests
 from shapely.geometry import Point, Polygon
 
 _LOGGER = logging.getLogger(__name__)
-_SESSION = None
+
 _REFRENCE = "https://github.com/troykelly/python-trackimo"
-_CONTACT_EMAIL = None
+"""Used to identify this to Open Street Map"""
+
 _USER_AGENT = f"Mozilla/5.0 (compatible; Trackimo; +{_REFRENCE})"
+"""The User Agent for OSM calls"""
+
 _HOST = "nominatim.openstreetmap.org"
+"""The OSM Host"""
+
 _PROTOCOL = "https"
+"""Protocol to talk to OSM Host"""
+
+_CONTACT_EMAIL = None
+"""For debugging: add email to OSM calls so they can reach out if we are being naughty"""
+
+_SESSION = None
+"""Store the Requests session"""
 
 
 class __GEO_CACHE(object):
