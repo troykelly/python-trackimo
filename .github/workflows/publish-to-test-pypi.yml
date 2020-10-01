@@ -25,6 +25,7 @@ jobs:
           sdist
           bdist_wheel
       - name: Publish distribution 📦 to Test PyPI
+        if: startsWith(github.ref, 'refs/tags')
         uses: pypa/gh-action-pypi-publish@master
         with:
           password: ${{ secrets.test_pypi_password }}

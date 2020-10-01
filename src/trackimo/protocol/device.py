@@ -7,12 +7,10 @@ import logging
 import sys
 import os
 from datetime import datetime, timedelta
-import geocoder
 import asyncio
+from ..adddress.geocode import reverse_geocode
 
 _logger = logging.getLogger(__name__)
-
-GEO_CACHE = {}
 
 
 class DeviceHandler(object):
@@ -182,13 +180,14 @@ class DeviceHandler(object):
 
 
 class Device(object):
-    def __init__(self, handler, id=None):
+    def __init__(self, handler, device_id=None):
         super().__init__()
 
         if handler:
             self.__handler = handler
-        if id:
-            self.__id = id
+
+        if device_id:
+            self.__id = device_id
 
         self.__previous_latitude = None
         self.__previous_longitude = None
@@ -307,7 +306,7 @@ class Device(object):
             self.__locationTriangulated = None
             self.__locationType = None
 
-        await self.__reverseGeocode()
+        self.__address = await reverse_geocode(self)
         self.__changed = self.__check_changed()
         return self.location
 
@@ -346,33 +345,6 @@ class Device(object):
             return
         location_data = await self.__handler.location(self.__id)
         return await self.location_event(location_data)
-
-    async def __reverseGeocode(self):
-        global GEO_CACHE
-
-        if not (self.__latitude and self.__longitude):
-            return None
-        location = [self.__latitude, self.__longitude]
-        location_text = str(self.__latitude) + " " + str(self.__longitude)
-        if location_text in GEO_CACHE:
-            return GEO_CACHE[location_text]
-
-        def getGeoData():
-            return geocoder.osm(location, method="reverse")
-
-        try:
-            g = await self.__handler.loop.run_in_executor(None, getGeoData)
-        except Exception as err:
-            _logger.error("Geocoder unavailable")
-            _logger.error(err)
-
-        if not g and g.json:
-            self.__address = None
-            return None
-
-        GEO_CACHE[location_text] = g.json
-        self.__address = GEO_CACHE[location_text]
-        return GEO_CACHE[location_text]
 
     async def build(self):
         details_data = await self.__handler.details(self.__id)
@@ -499,92 +471,79 @@ class Device(object):
     @property
     def attribution(self):
         try:
-            address = self.__address
+            return self.__address.attribution
         except AttributeError:
             return None
-        if "raw" in address and "licence" in address["raw"]:
-            return address["raw"]["licence"]
-        return None
 
     @property
     def address(self):
         try:
-            address = self.__address
+            return self.__address.label
         except AttributeError:
             return None
-        if "address" in address:
-            return address["address"]
-        return None
 
     @property
     def city(self):
         try:
-            address = self.__address
+            return self.__address.city
         except AttributeError:
             return None
-        if "city" in address:
-            return address["city"]
-        return None
 
     @property
     def country(self):
         try:
-            address = self.__address
+            return self.__address.country
         except AttributeError:
             return None
-        if "country" in address:
-            return address["country"]
-        return None
 
     @property
     def postalcode(self):
         try:
-            address = self.__address
+            return self.__address.postcode
         except AttributeError:
             return None
-        if "postal" in address:
-            return address["postal"]
-        return None
 
     @property
     def region(self):
         try:
-            address = self.__address
+            return self.__address.county
         except AttributeError:
             return None
-        if "region" in address:
-            return address["region"]
-        return None
 
     @property
     def state(self):
         try:
-            address = self.__address
+            return self.__address.state
         except AttributeError:
             return None
-        if "state" in address:
-            return address["state"]
-        return None
 
     @property
     def street(self):
         try:
-            address = self.__address
+            return self.__address.street
         except AttributeError:
             return None
-        if "street" in address:
-            return address["street"]
-        return None
 
     @property
     def suburb(self):
         try:
-            address = self.__address
+            return self.__address.district
         except AttributeError:
             return None
-        if "suburb" in address:
-            return address["suburb"]
-        return None
+
+    @property
+    def point(self):
+        try:
+            return self.__address.point
+        except AttributeError:
+            return None
+
+    @property
+    def polygon(self):
+        try:
+            return self.__address.polygon
+        except AttributeError:
+            return None
 
     @property
     def latitude(self):
@@ -794,6 +753,13 @@ class Device(object):
     def features(self):
         try:
             return self.__features
+        except AttributeError:
+            return None
+
+    @property
+    def loop(self):
+        try:
+            return self.__handler.loop
         except AttributeError:
             return None
 
